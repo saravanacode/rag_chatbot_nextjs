@@ -8,3 +8,4 @@ openai==1.3.0
 google-generativeai==0.6.0
 firecrawl
 gunicorn
+huggingface-hub==0.19.4
