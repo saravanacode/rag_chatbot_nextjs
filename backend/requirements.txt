@@ -6,5 +6,5 @@ sentence-transformers==2.2.2
 pinecone
 openai==1.3.0
 google-generativeai==0.6.0
-firecrawl==0.0.8
-gunicorn==21.2.0
+firecrawl
+gunicorn
