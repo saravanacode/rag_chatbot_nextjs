@@ -13,7 +13,7 @@ import time
 try:
     from sentence_transformers import SentenceTransformer
     from pinecone import Pinecone, ServerlessSpec
-    import openai
+    import google.generativeai as genai
     from firecrawl import AsyncFirecrawlApp, ScrapeOptions
     AI_IMPORTS_AVAILABLE = True
 except ImportError as e:
@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 # Configuration from environment variables
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY") 
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
 INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "airport-index")
@@ -37,7 +37,7 @@ MODEL_NAME = 'BAAI/bge-small-en-v1.5'
 PORT = int(os.environ.get('PORT', 5000))
 
 print("🚀 Backend Server Starting...")
-print(f"📡 OpenAI API Key: {'✓ Loaded' if OPENAI_API_KEY else '✗ Missing'}")
+print(f"📡 Gemini API Key: {'✓ Loaded' if GEMINI_API_KEY else '✗ Missing'}")
 print(f"📡 Pinecone API Key: {'✓ Loaded' if PINECONE_API_KEY else '✗ Missing'}")
 print(f"📡 Firecrawl API Key: {'✓ Loaded' if FIRECRAWL_API_KEY else '✗ Missing'}")
 print(f"🤖 AI Imports: {'✓ Available' if AI_IMPORTS_AVAILABLE else '✗ Missing'}")
@@ -47,7 +47,7 @@ ai_components = {
     "model": None,
     "pinecone": None,
     "index": None,
-    "openai_client": None,
+    "gemini_model": None,
     "loaded": False
 }
 
@@ -72,7 +72,7 @@ def load_ai_components():
     global ai_components
     
     if not AI_IMPORTS_AVAILABLE:
-        raise Exception("AI libraries not installed. Please install: pip install sentence-transformers pinecone-client openai firecrawl-py")
+        raise Exception("AI libraries not installed. Please install: pip install sentence-transformers pinecone-client google-generativeai firecrawl-py")
     
     if ai_components["loaded"]:
         return ai_components
@@ -106,9 +106,10 @@ def load_ai_components():
         ai_components["index"] = ai_components["pinecone"].Index(INDEX_NAME)
         print("✅ Pinecone connection established")
         
-        # Initialize OpenAI client
-        ai_components["openai_client"] = openai.OpenAI(api_key=OPENAI_API_KEY)
-        print("✅ OpenAI client initialized")
+        # Initialize Gemini
+        genai.configure(api_key=GEMINI_API_KEY)
+        ai_components["gemini_model"] = genai.GenerativeModel('gemini-1.5-flash')
+        print("✅ Gemini client initialized")
         
         ai_components["loaded"] = True
         print("🎉 All AI components loaded successfully!")
@@ -244,13 +245,13 @@ def run_vectorization_in_thread(url_list: list[str], firecrawl_key: str):
 
 def search_and_answer(question, top_k=5):
     """
-    Search the vector database and generate an AI answer
+    Search the vector database and generate an AI answer using Gemini
     """
     try:
         components = load_ai_components()
         model = components["model"]
         index = components["index"]
-        openai_client = components["openai_client"]
+        gemini_model = components["gemini_model"]
         
         print(f"🔍 Searching for: '{question}'")
         
@@ -296,38 +297,28 @@ def search_and_answer(question, top_k=5):
         if len(combined_context) > 4000:  # Limit context size
             combined_context = combined_context[:4000] + "..."
         
-        # 4. Generate AI answer using OpenAI
-        print("🤖 Generating AI answer...")
+        # 4. Generate AI answer using Gemini
+        print("🤖 Generating AI answer with Gemini...")
         
-        system_prompt = """You are a helpful AI assistant with access to a vector database. 
-        Use the provided context to answer questions accurately.
-        
-        Guidelines:
-        - Be helpful, accurate, and concise
-        - Only use information from the provided context
-        - If the context doesn't contain enough information, say so
-        - Include specific details when available
-        - Be friendly and professional
-        """
-        
-        user_prompt = f"""Question: {question}
+        prompt = f"""You are a helpful AI assistant with access to a vector database. 
+Use the provided context to answer questions accurately.
+
+Guidelines:
+- Be helpful, accurate, and concise
+- Only use information from the provided context
+- If the context doesn't contain enough information, say so
+- Include specific details when available
+- Be friendly and professional
+
+Question: {question}
 
 Context from vector database:
 {combined_context}
 
 Please provide a helpful answer based on the context above."""
         
-        response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            max_tokens=500,
-            temperature=0.3
-        )
-        
-        ai_answer = response.choices[0].message.content
+        response = gemini_model.generate_content(prompt)
+        ai_answer = response.text
         
         return {
             'answer': ai_answer,
@@ -354,7 +345,7 @@ def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "env_keys_loaded": {
-            "openai": bool(OPENAI_API_KEY),
+            "gemini": bool(GEMINI_API_KEY),
             "pinecone": bool(PINECONE_API_KEY),
             "firecrawl": bool(FIRECRAWL_API_KEY)
         },
@@ -369,13 +360,13 @@ def start_demo_mode():
         if not AI_IMPORTS_AVAILABLE:
             return jsonify({
                 "success": False,
-                "error": "AI libraries not installed. Please install: pip install sentence-transformers pinecone-client openai firecrawl-py"
+                "error": "AI libraries not installed. Please install: pip install sentence-transformers pinecone-client google-generativeai firecrawl-py"
             }), 400
         
-        if not OPENAI_API_KEY or not PINECONE_API_KEY:
+        if not GEMINI_API_KEY or not PINECONE_API_KEY:
             return jsonify({
                 "success": False,
-                "error": "OpenAI and Pinecone API keys required for demo mode"
+                "error": "Gemini and Pinecone API keys required for demo mode"
             }), 400
         
         # Load AI components
@@ -385,7 +376,7 @@ def start_demo_mode():
         stored_data['demo_mode'] = True
         stored_data['api_keys'] = {
             'pinecone': PINECONE_API_KEY,
-            'chatgpt': OPENAI_API_KEY
+            'gemini': GEMINI_API_KEY
         }
         
         return jsonify({
@@ -394,7 +385,7 @@ def start_demo_mode():
             "data": {
                 "model_loaded": bool(components["model"]),
                 "pinecone_connected": bool(components["index"]),
-                "openai_ready": bool(components["openai_client"]),
+                "gemini_ready": bool(components["gemini_model"]),
                 "index_name": INDEX_NAME,
                 "model_name": MODEL_NAME
             }
@@ -420,7 +411,7 @@ def crawl_and_vectorize():
         if not AI_IMPORTS_AVAILABLE:
             return jsonify({
                 "success": False,
-                "error": "AI libraries not installed. Please install: pip install sentence-transformers pinecone-client openai firecrawl-py"
+                "error": "AI libraries not installed. Please install: pip install sentence-transformers pinecone-client google-generativeai firecrawl-py"
             }), 400
             
         firecrawl_key = stored_data['api_keys'].get('firecrawl')
@@ -485,7 +476,7 @@ def store_config():
         stored_data['api_keys'] = {
             'pinecone': api_keys.get('pinecone') or PINECONE_API_KEY,
             'firecrawl': api_keys.get('firecrawl') or FIRECRAWL_API_KEY, 
-            'chatgpt': api_keys.get('chatgpt') or OPENAI_API_KEY
+            'gemini': api_keys.get('gemini') or GEMINI_API_KEY
         }
         
         # Store URLs
@@ -513,7 +504,7 @@ def store_config():
                 "urls_count": len(urls),
                 "api_keys_received": list(api_keys.keys()),
                 "env_keys_used": {
-                    "openai": bool(OPENAI_API_KEY and not api_keys.get('chatgpt')),
+                    "gemini": bool(GEMINI_API_KEY and not api_keys.get('gemini')),
                     "pinecone": bool(PINECONE_API_KEY and not api_keys.get('pinecone')),
                     "firecrawl": bool(FIRECRAWL_API_KEY and not api_keys.get('firecrawl'))
                 }
@@ -529,7 +520,7 @@ def store_config():
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    """Handle chat requests using OpenAI API"""
+    """Handle chat requests using Gemini API"""
     try:
         data = request.get_json()
         user_message = data.get('message', '')
@@ -540,11 +531,11 @@ def chat():
                 "error": "No message provided"
             }), 400
         
-        openai_key = stored_data['api_keys'].get('chatgpt')
-        if not openai_key:
+        gemini_key = stored_data['api_keys'].get('gemini')
+        if not gemini_key:
             return jsonify({
                 "success": False,
-                "error": "OpenAI API key not available"
+                "error": "Gemini API key not available"
             }), 400
         
         # Check if we should use vector search (demo mode OR completed vectorization)
@@ -566,40 +557,17 @@ def chat():
             except Exception as vector_error:
                 print(f"⚠️ Vector search failed, falling back to regular mode: {vector_error}")
         
-        # Fallback to regular OpenAI chat without context
-        headers = {
-            'Authorization': f'Bearer {openai_key}',
-            'Content-Type': 'application/json'
-        }
-        
-        messages = [
-            {
-                "role": "system",
-                "content": "You are a helpful AI assistant. Answer questions to the best of your ability."
-            },
-            {
-                "role": "user",
-                "content": user_message
-            }
-        ]
-        
-        payload = {
-            'model': 'gpt-4o-mini',
-            'messages': messages,
-            'max_tokens': 500,
-            'temperature': 0.7
-        }
-        
-        response = requests.post(
-            'https://api.openai.com/v1/chat/completions',
-            headers=headers,
-            json=payload,
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            ai_response = result['choices'][0]['message']['content']
+        # Fallback to regular Gemini chat without context
+        try:
+            genai.configure(api_key=gemini_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            prompt = f"""You are a helpful AI assistant. Answer questions to the best of your ability.
+
+User question: {user_message}"""
+            
+            response = model.generate_content(prompt)
+            ai_response = response.text
             
             return jsonify({
                 "success": True,
@@ -608,10 +576,11 @@ def chat():
                 "demo_mode": False,
                 "vectorized": False
             })
-        else:
+            
+        except Exception as gemini_error:
             return jsonify({
                 "success": False,
-                "error": f"OpenAI API error: {response.status_code} - {response.text}"
+                "error": f"Gemini API error: {str(gemini_error)}"
             }), 500
             
     except Exception as e:
@@ -634,7 +603,7 @@ def get_status():
         "ai_components_loaded": ai_components["loaded"],
         "vectorization_status": stored_data["vectorization_status"],
         "env_keys": {
-            "openai": bool(OPENAI_API_KEY),
+            "gemini": bool(GEMINI_API_KEY),
             "pinecone": bool(PINECONE_API_KEY), 
             "firecrawl": bool(FIRECRAWL_API_KEY)
         }
@@ -664,4 +633,4 @@ if __name__ == '__main__':
     print("="*50)
     
     # Bind to 0.0.0.0 for Render
-    app.run(host='0.0.0.0', port=PORT, debug=False) 
+    app.run(host='0.0.0.0', port=PORT, debug=False)

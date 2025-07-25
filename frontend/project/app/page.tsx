@@ -40,7 +40,7 @@ interface BackendStatus {
   ai_components_loaded: boolean;
   vectorization_status: VectorizationStatus;
   env_keys: {
-    openai: boolean;
+    gemini: boolean;
     pinecone: boolean;
     firecrawl: boolean;
   };
@@ -137,7 +137,7 @@ export default function ChatbotApp() {
 I can now answer questions using semantic search through your content. The AI assistant is powered by:
 • Sentence Transformer model for embeddings
 • Pinecone vector database for search
-• OpenAI GPT for intelligent responses
+• gemini GPT for intelligent responses
 
 Try asking questions about your content!`,
             sender: 'bot',
@@ -194,8 +194,8 @@ I'm ready to help using vector search and AI reasoning!`,
       return;
     }
 
-    if (!backendStatus?.env_keys.openai || !backendStatus?.env_keys.pinecone) {
-      alert('Demo mode requires OpenAI and Pinecone environment variables to be set. Please use "Get Started" to enter API keys manually.');
+    if (!backendStatus?.env_keys.gemini || !backendStatus?.env_keys.pinecone) {
+      alert('Demo mode requires gemini and Pinecone environment variables to be set. Please use "Get Started" to enter API keys manually.');
       return;
     }
 
@@ -510,7 +510,7 @@ I'm ready to help you with information from the vector database!`,
                 <p className="text-gray-600 text-sm">Enter your API keys or use environment variables</p>
                 {backendStatus?.env_keys && (
                   <div className="text-xs text-gray-500 mt-2">
-                    Env loaded: OpenAI({backendStatus.env_keys.openai ? '✓' : '✗'}), 
+                    Env loaded: gemini({backendStatus.env_keys.gemini ? '✓' : '✗'}), 
                     Pinecone({backendStatus.env_keys.pinecone ? '✓' : '✗'}), 
                     Firecrawl({backendStatus.env_keys.firecrawl ? '✓' : '✗'})
                   </div>
@@ -546,11 +546,11 @@ I'm ready to help you with information from the vector database!`,
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      ChatGPT API Key {backendStatus?.env_keys.openai && <span className="text-green-600">(env loaded)</span>}
+                      ChatGPT API Key {backendStatus?.env_keys.gemini && <span className="text-green-600">(env loaded)</span>}
                     </label>
                     <Input
                       type="password"
-                      placeholder={backendStatus?.env_keys.openai ? "Using environment variable" : "Enter ChatGPT API key"}
+                      placeholder={backendStatus?.env_keys.gemini ? "Using environment variable" : "Enter ChatGPT API key"}
                       value={apiKeys.chatgpt}
                       onChange={(e) => setApiKeys(prev => ({ ...prev, chatgpt: e.target.value }))}
                       className="border-2 border-gray-200 focus:border-black transition-colors"
