@@ -61,7 +61,7 @@ print(f"📡 Pinecone API Key: {'✓ Loaded' if PINECONE_API_KEY else '✗ Missi
 print(f"📡 Firecrawl API Key: {'✓ Loaded' if FIRECRAWL_API_KEY else '✗ Missing'}")
 print(f"🤖 AI Imports: {'✓ Available' if AI_IMPORTS_AVAILABLE else '✗ Missing'}")
 
-# AI Assistant components (load immediately if API keys available)
+# AI Assistant components (load after server starts)
 ai_components = {
     "model": None,
     "pinecone": None,
@@ -149,10 +149,12 @@ def load_ai_components():
         print(f"❌ Error loading AI components: {str(e)}")
         raise e
 
-# Auto-load AI components if API keys are available
 def init_ai_components_background():
-    """Initialize AI components in background thread"""
+    """Initialize AI components in background thread with delay"""
     if AI_IMPORTS_AVAILABLE and GEMINI_API_KEY and PINECONE_API_KEY:
+        # Wait 10 seconds for server to fully start before loading models
+        print("⏱️ Waiting 10 seconds for server to stabilize before loading AI components...")
+        time.sleep(10)
         print("🚀 Starting AI components initialization in background...")
         try:
             load_ai_components()
@@ -161,11 +163,17 @@ def init_ai_components_background():
     else:
         print("⏭️ Skipping AI initialization - API keys not available")
 
-# Start AI loading in background thread immediately
-if __name__ != '__main__':  # Only when running via gunicorn
-    thread = threading.Thread(target=init_ai_components_background)
-    thread.daemon = True
-    thread.start()
+# Start background loading after first request (not immediately)
+background_loading_started = False
+
+def start_background_loading():
+    """Start background loading if not already started"""
+    global background_loading_started
+    if not background_loading_started:
+        background_loading_started = True
+        thread = threading.Thread(target=init_ai_components_background)
+        thread.daemon = True
+        thread.start()
 
 async def process_urls_to_pinecone(url_list: list[str], firecrawl_key: str):
     """
@@ -388,6 +396,9 @@ Please provide a helpful answer based on the context above."""
 @app.route('/', methods=['GET'])
 def root():
     """Root endpoint for health checks"""
+    # Start background loading on first request
+    start_background_loading()
+    
     return jsonify({
         "message": "Hipster Backend API is running!",
         "status": "healthy",
@@ -408,6 +419,9 @@ def root():
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
+    # Start background loading on first request
+    start_background_loading()
+    
     return jsonify({
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
@@ -737,12 +751,6 @@ def debug_status():
 if __name__ == '__main__':
     print("🌟 Starting Flask Backend Server")
     print(f"📡 Port: {PORT}")
-    
-    # Initialize AI components in background for local development
-    thread = threading.Thread(target=init_ai_components_background)
-    thread.daemon = True
-    thread.start()
-    
     print("📡 API Endpoints:")
     print("   GET  /health - Health check")
     print("   POST /api/demo-mode - Start demo mode with AI assistant")
