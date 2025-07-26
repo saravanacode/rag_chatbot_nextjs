@@ -3,8 +3,10 @@ services:
     name: hipster-backend
     env: python
     buildCommand: >
-      pip install --no-cache-dir --prefer-binary
-      -r requirements.txt
+      pip install --no-cache-dir --prefer-binary -r requirements.txt
+    envVars:
+      - key: PIP_ONLY_BINARY
+        value: ":all:"
     startCommand: gunicorn --bind 0.0.0.0:$PORT app.backend_server:app
     envVars:
       - key: PYTHON_VERSION
