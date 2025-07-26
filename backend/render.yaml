@@ -2,16 +2,26 @@ services:
   - type: web
     name: hipster-backend
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: >
+      pip install --no-cache-dir --prefer-binary
+      -r requirements.txt
     startCommand: gunicorn --bind 0.0.0.0:$PORT app.backend_server:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+
+      # --- Required Secrets ---
       - key: OPENAI_API_KEY
         sync: false
       - key: PINECONE_API_KEY
         sync: false
       - key: FIRECRAWL_API_KEY
         sync: false
+
+      # --- Custom App Vars ---
       - key: PINECONE_INDEX_NAME
         value: airport-index
+
+      # --- Avoid source builds ---
+      - key: PIP_ONLY_BINARY
+        value: ":all:"
