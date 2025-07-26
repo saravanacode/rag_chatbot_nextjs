@@ -9,6 +9,7 @@ google-generativeai==0.6.0
 firecrawl
 gunicorn
 huggingface-hub==0.19.4
-transformers==4.40.2
-tokenizers==0.13.3
+transformers==4.39.3
+tokenizers==0.19.1
 pinecone-client==2.2.0
+
