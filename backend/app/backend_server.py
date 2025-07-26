@@ -338,6 +338,24 @@ Please provide a helpful answer based on the context above."""
         }
 
 # Routes
+@app.route('/', methods=['GET'])
+def root():
+    """Root endpoint for health checks"""
+    return jsonify({
+        "message": "Hipster Backend API is running!",
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "endpoints": [
+            "GET /health - Health check",
+            "POST /api/demo-mode - Start demo mode",
+            "POST /api/store-config - Store configuration",
+            "POST /api/crawl-and-vectorize - Crawl and vectorize",
+            "GET /api/vectorization-status - Get status",
+            "POST /api/chat - Chat with AI",
+            "GET /api/status - Get current status"
+        ]
+    })
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
