@@ -227,7 +227,9 @@ I'm ready to help using vector search and AI reasoning!`,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        // Add longer timeout for model loading
+        signal: AbortSignal.timeout(120000) // 2 minutes timeout
       });
 
       if (demoResponse.ok) {
@@ -258,9 +260,9 @@ I'm ready to help you with information from the vector database!`,
         const error = await demoResponse.json();
         alert(`Demo mode failed: ${error.error}`);
       }
-    } catch (error) {
-      console.error('Error during demo setup:', error);
-      alert('Failed to start demo mode. Please check the backend server and environment variables.');
+    } catch (error: any) {
+      console.error('Demo mode error:', error);
+      alert(`Failed to start demo mode. Please check the backend server and environment variables.\n\nError: ${error.message}`);
     } finally {
       setIsCrawling(false);
     }
