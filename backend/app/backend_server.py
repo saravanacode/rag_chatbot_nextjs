@@ -43,7 +43,7 @@ CORS(app, origins=[
     "https://hipster-frontend.onrender.com", 
     "http://localhost:3000",
     "http://localhost:3001"
-])  # Enable CORS for all routes
+])
 
 # Configuration from environment variables
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -61,13 +61,14 @@ print(f"📡 Pinecone API Key: {'✓ Loaded' if PINECONE_API_KEY else '✗ Missi
 print(f"📡 Firecrawl API Key: {'✓ Loaded' if FIRECRAWL_API_KEY else '✗ Missing'}")
 print(f"🤖 AI Imports: {'✓ Available' if AI_IMPORTS_AVAILABLE else '✗ Missing'}")
 
-# AI Assistant components (loaded lazily)
+# AI Assistant components (load immediately if API keys available)
 ai_components = {
     "model": None,
     "pinecone": None,
     "index": None,
     "gemini_model": None,
-    "loaded": False
+    "loaded": False,
+    "loading": False
 }
 
 # Store API keys and URLs received from frontend
@@ -96,14 +97,20 @@ def load_ai_components():
     if ai_components["loaded"]:
         return ai_components
     
+    if ai_components["loading"]:
+        return ai_components
+    
+    ai_components["loading"] = True
     print("🔄 Loading AI components...")
     
     try:
         # Load sentence transformer model
+        print("🔄 Loading sentence transformer model...")
         ai_components["model"] = SentenceTransformer(MODEL_NAME)
         print("✅ Sentence transformer model loaded")
         
         # Initialize Pinecone
+        print("🔄 Connecting to Pinecone...")
         ai_components["pinecone"] = Pinecone(api_key=PINECONE_API_KEY)
         
         # Create index if not exists
@@ -126,18 +133,39 @@ def load_ai_components():
         print("✅ Pinecone connection established")
         
         # Initialize Gemini
+        print("🔄 Initializing Gemini...")
         genai.configure(api_key=GEMINI_API_KEY)
         ai_components["gemini_model"] = genai.GenerativeModel('gemini-1.5-flash')
         print("✅ Gemini client initialized")
         
         ai_components["loaded"] = True
+        ai_components["loading"] = False
         print("🎉 All AI components loaded successfully!")
         
         return ai_components
         
     except Exception as e:
+        ai_components["loading"] = False
         print(f"❌ Error loading AI components: {str(e)}")
         raise e
+
+# Auto-load AI components if API keys are available
+def init_ai_components_background():
+    """Initialize AI components in background thread"""
+    if AI_IMPORTS_AVAILABLE and GEMINI_API_KEY and PINECONE_API_KEY:
+        print("🚀 Starting AI components initialization in background...")
+        try:
+            load_ai_components()
+        except Exception as e:
+            print(f"❌ Background AI initialization failed: {e}")
+    else:
+        print("⏭️ Skipping AI initialization - API keys not available")
+
+# Start AI loading in background thread immediately
+if __name__ != '__main__':  # Only when running via gunicorn
+    thread = threading.Thread(target=init_ai_components_background)
+    thread.daemon = True
+    thread.start()
 
 async def process_urls_to_pinecone(url_list: list[str], firecrawl_key: str):
     """
@@ -364,6 +392,8 @@ def root():
         "message": "Hipster Backend API is running!",
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
+        "ai_components_loaded": ai_components["loaded"],
+        "ai_components_loading": ai_components["loading"],
         "endpoints": [
             "GET /health - Health check",
             "POST /api/demo-mode - Start demo mode",
@@ -387,7 +417,8 @@ def health_check():
             "firecrawl": bool(FIRECRAWL_API_KEY)
         },
         "ai_imports_available": AI_IMPORTS_AVAILABLE,
-        "ai_components_loaded": ai_components["loaded"]
+        "ai_components_loaded": ai_components["loaded"],
+        "ai_components_loading": ai_components["loading"]
     })
 
 @app.route('/api/demo-status', methods=['GET'])
@@ -397,6 +428,7 @@ def get_demo_status():
         "success": True,
         "data": {
             "ai_components_loaded": ai_components["loaded"],
+            "ai_components_loading": ai_components["loading"],
             "model_loaded": bool(ai_components.get("model")),
             "pinecone_connected": bool(ai_components.get("index")),
             "gemini_ready": bool(ai_components.get("gemini_model")),
@@ -406,7 +438,7 @@ def get_demo_status():
 
 @app.route('/api/demo-mode', methods=['POST'])
 def start_demo_mode():
-    """Start demo mode - load AI components and set demo flag"""
+    """Start demo mode - instant if components already loaded"""
     try:
         if not AI_IMPORTS_AVAILABLE:
             return jsonify({
@@ -420,8 +452,38 @@ def start_demo_mode():
                 "error": "Gemini and Pinecone API keys required for demo mode"
             }), 400
         
-        # Start loading in background if not already loaded
-        if not ai_components["loaded"]:
+        # Check if components are already loaded
+        if ai_components["loaded"]:
+            # Instant demo mode - go straight to chat
+            stored_data['demo_mode'] = True
+            stored_data['api_keys'] = {
+                'pinecone': PINECONE_API_KEY,
+                'gemini': GEMINI_API_KEY
+            }
+            
+            return jsonify({
+                "success": True,
+                "message": "Demo mode started successfully! AI assistant is ready.",
+                "loading": False,
+                "data": {
+                    "model_loaded": bool(ai_components["model"]),
+                    "pinecone_connected": bool(ai_components["index"]),
+                    "gemini_ready": bool(ai_components["gemini_model"]),
+                    "index_name": INDEX_NAME,
+                    "model_name": MODEL_NAME
+                }
+            })
+        
+        elif ai_components["loading"]:
+            # Components are still loading
+            return jsonify({
+                "success": True,
+                "message": "AI components are still loading. Please wait...",
+                "loading": True
+            })
+        
+        else:
+            # Start loading now (fallback)
             def load_components():
                 try:
                     load_ai_components()
@@ -434,7 +496,6 @@ def start_demo_mode():
                 except Exception as e:
                     print(f"❌ Background loading failed: {e}")
             
-            import threading
             thread = threading.Thread(target=load_components)
             thread.daemon = True
             thread.start()
@@ -443,25 +504,6 @@ def start_demo_mode():
                 "success": True,
                 "message": "Demo mode initialization started. Loading AI components...",
                 "loading": True
-            })
-        else:
-            # Already loaded
-            stored_data['demo_mode'] = True
-            stored_data['api_keys'] = {
-                'pinecone': PINECONE_API_KEY,
-                'gemini': GEMINI_API_KEY
-            }
-            return jsonify({
-                "success": True,
-                "message": "Demo mode started successfully! AI assistant is ready.",
-                "loading": False,
-                "data": {
-                    "model_loaded": bool(ai_components["model"]),
-                    "pinecone_connected": bool(ai_components["index"]),
-                    "gemini_ready": bool(ai_components["gemini_model"]),
-                    "index_name": INDEX_NAME,
-                    "model_name": MODEL_NAME
-                }
             })
         
     except Exception as e:
@@ -695,6 +737,12 @@ def debug_status():
 if __name__ == '__main__':
     print("🌟 Starting Flask Backend Server")
     print(f"📡 Port: {PORT}")
+    
+    # Initialize AI components in background for local development
+    thread = threading.Thread(target=init_ai_components_background)
+    thread.daemon = True
+    thread.start()
+    
     print("📡 API Endpoints:")
     print("   GET  /health - Health check")
     print("   POST /api/demo-mode - Start demo mode with AI assistant")

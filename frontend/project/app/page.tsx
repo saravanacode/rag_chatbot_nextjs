@@ -223,48 +223,40 @@ I'm ready to help using vector search and AI reasoning!`,
     setIsCrawling(true);
 
     try {
-      // Start demo mode (this will start loading in background)
       const demoResponse = await fetch(`${BACKEND_URL}/api/demo-mode`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        },
-        // Add longer timeout for model loading
-        signal: AbortSignal.timeout(120000) // 2 minutes timeout
+        }
       });
 
       if (demoResponse.ok) {
         const result = await demoResponse.json();
-        console.log('Demo mode initialization:', result);
+        console.log('Demo mode result:', result);
         
         if (result.loading) {
           // Show loading message and poll for completion
           setMessages([{
             id: '1',
-            text: '🔄 Loading AI components... This may take a few minutes for first-time setup.\n\nDownloading sentence transformer model and connecting to vector database...',
+            text: '🔄 AI components are still loading... Please wait a moment.',
             sender: 'bot',
             timestamp: new Date()
           }]);
           
-          // Poll for completion
+          // Poll every 3 seconds for completion
           const pollInterval = setInterval(async () => {
             try {
-              const statusResponse = await fetch(`${BACKEND_URL}/api/status`);
+              const statusResponse = await fetch(`${BACKEND_URL}/api/demo-status`);
               if (statusResponse.ok) {
                 const status = await statusResponse.json();
-                if (status.ai_components_loaded && status.demo_mode) {
+                if (status.data.ai_components_loaded) {
                   clearInterval(pollInterval);
                   setCurrentScreen('chat');
                   setMessages([{
                     id: '2',
                     text: `🎉 Welcome to AI Assistant Demo Mode! 
 
-AI components loaded successfully:
-• Sentence transformer model ready
-• Pinecone vector database connected
-• Gemini AI initialized
-
-I can now search through pre-indexed content to answer your questions using semantic search and AI reasoning.
+I'm ready to answer your questions using semantic search and AI reasoning.
 
 Try asking questions like:
 • "Where can I find restaurants?"
@@ -283,25 +275,25 @@ I'm ready to help you with information from the vector database!`,
             } catch (error) {
               console.error('Status polling error:', error);
             }
-          }, 5000); // Poll every 5 seconds
+          }, 3000);
           
-          // Timeout after 5 minutes
+          // Timeout after 2 minutes
           setTimeout(() => {
             clearInterval(pollInterval);
             if (isCrawling) {
               setIsCrawling(false);
               alert('Demo mode loading timed out. Please try again.');
             }
-          }, 300000);
+          }, 120000);
           
         } else {
-          // Already loaded
+          // Instant demo mode - go straight to chat
           setCurrentScreen('chat');
           setMessages([{
             id: '1',
-            text: `🎉 Welcome to AI Assistant Demo Mode! I've loaded the sentence transformer model and connected to the Pinecone vector database.
+            text: `🎉 Welcome to AI Assistant Demo Mode! 
 
-I can now search through pre-indexed content to answer your questions using semantic search and AI reasoning.
+I'm ready to answer your questions using semantic search and AI reasoning.
 
 Try asking questions like:
 • "Where can I find restaurants?"
