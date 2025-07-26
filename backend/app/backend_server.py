@@ -24,7 +24,12 @@ except ImportError as e:
 dotenv.load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app, origins=[
+    "https://rag-chatbot-nextjs-1.onrender.com",
+    "https://hipster-frontend.onrender.com", 
+    "http://localhost:3000",
+    "http://localhost:3001"
+])  # Enable CORS for all routes
 
 # Configuration from environment variables
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

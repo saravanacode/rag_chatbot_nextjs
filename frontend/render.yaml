@@ -9,3 +9,4 @@ services:
         value: 18.17.0
       - key: NEXT_PUBLIC_BACKEND_URL
         value: https://rag-chatbot-nextjs.onrender.com
+               

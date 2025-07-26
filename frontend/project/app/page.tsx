@@ -68,6 +68,26 @@ export default function ChatbotApp() {
   
   const vectorizationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Add this right after the BACKEND_URL line (around line 47)
+  console.log('🔍 BACKEND_URL:', BACKEND_URL);
+
+  // Add this useEffect to test connectivity
+  useEffect(() => {
+    const testBackendConnection = async () => {
+      try {
+        console.log('🔗 Testing backend connection to:', BACKEND_URL);
+        const response = await fetch(`${BACKEND_URL}/health`);
+        console.log('✅ Backend response status:', response.status);
+        const data = await response.json();
+        console.log('✅ Backend response data:', data);
+      } catch (error) {
+        console.error('❌ Backend connection failed:', error);
+      }
+    };
+    
+    testBackendConnection();
+  }, []);
+
   // Check backend connection on mount
   useEffect(() => {
     checkBackendConnection();
