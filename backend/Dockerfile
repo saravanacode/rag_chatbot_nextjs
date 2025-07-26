@@ -16,7 +16,7 @@ ENV PIP_NO_CACHE_DIR=1
 ENV PIP_DEFAULT_TIMEOUT=100
 ENV PIP_RETRIES=5
 
-# Copy requirements first for better caching
+# Copy requirements
 COPY requirements.txt .
 
 # Install Python dependencies with retries and CPU-only torch

@@ -11,4 +11,5 @@ gunicorn
 huggingface-hub==0.19.4
 transformers==4.39.3
 pinecone-client==2.2.0
+numpy==1.24.3
 
