@@ -223,6 +223,7 @@ I'm ready to help using vector search and AI reasoning!`,
     setIsCrawling(true);
 
     try {
+      // Start demo mode (this will start loading in background)
       const demoResponse = await fetch(`${BACKEND_URL}/api/demo-mode`, {
         method: 'POST',
         headers: {
@@ -234,14 +235,34 @@ I'm ready to help using vector search and AI reasoning!`,
 
       if (demoResponse.ok) {
         const result = await demoResponse.json();
-        console.log('Demo mode started:', result);
+        console.log('Demo mode initialization:', result);
         
-        await fetchBackendStatus();
-        setCurrentScreen('chat');
-        
-        setMessages([{
-          id: '1',
-          text: `🎉 Welcome to AI Assistant Demo Mode! I've loaded the sentence transformer model (${result.data.model_name}) and connected to the Pinecone vector database (${result.data.index_name}).
+        if (result.loading) {
+          // Show loading message and poll for completion
+          setMessages([{
+            id: '1',
+            text: '🔄 Loading AI components... This may take a few minutes for first-time setup.\n\nDownloading sentence transformer model and connecting to vector database...',
+            sender: 'bot',
+            timestamp: new Date()
+          }]);
+          
+          // Poll for completion
+          const pollInterval = setInterval(async () => {
+            try {
+              const statusResponse = await fetch(`${BACKEND_URL}/api/status`);
+              if (statusResponse.ok) {
+                const status = await statusResponse.json();
+                if (status.ai_components_loaded && status.demo_mode) {
+                  clearInterval(pollInterval);
+                  setCurrentScreen('chat');
+                  setMessages([{
+                    id: '2',
+                    text: `🎉 Welcome to AI Assistant Demo Mode! 
+
+AI components loaded successfully:
+• Sentence transformer model ready
+• Pinecone vector database connected
+• Gemini AI initialized
 
 I can now search through pre-indexed content to answer your questions using semantic search and AI reasoning.
 
@@ -253,17 +274,56 @@ Try asking questions like:
 • "How do I get to the city center?"
 
 I'm ready to help you with information from the vector database!`,
-          sender: 'bot',
-          timestamp: new Date()
-        }]);
+                    sender: 'bot',
+                    timestamp: new Date()
+                  }]);
+                  setIsCrawling(false);
+                }
+              }
+            } catch (error) {
+              console.error('Status polling error:', error);
+            }
+          }, 5000); // Poll every 5 seconds
+          
+          // Timeout after 5 minutes
+          setTimeout(() => {
+            clearInterval(pollInterval);
+            if (isCrawling) {
+              setIsCrawling(false);
+              alert('Demo mode loading timed out. Please try again.');
+            }
+          }, 300000);
+          
+        } else {
+          // Already loaded
+          setCurrentScreen('chat');
+          setMessages([{
+            id: '1',
+            text: `🎉 Welcome to AI Assistant Demo Mode! I've loaded the sentence transformer model and connected to the Pinecone vector database.
+
+I can now search through pre-indexed content to answer your questions using semantic search and AI reasoning.
+
+Try asking questions like:
+• "Where can I find restaurants?"
+• "How do I get free WiFi?"
+• "What shopping options are available?"
+• "Where are the prayer rooms?"
+• "How do I get to the city center?"
+
+I'm ready to help you with information from the vector database!`,
+            sender: 'bot',
+            timestamp: new Date()
+          }]);
+          setIsCrawling(false);
+        }
       } else {
         const error = await demoResponse.json();
         alert(`Demo mode failed: ${error.error}`);
+        setIsCrawling(false);
       }
     } catch (error: any) {
       console.error('Demo mode error:', error);
       alert(`Failed to start demo mode. Please check the backend server and environment variables.\n\nError: ${error.message}`);
-    } finally {
       setIsCrawling(false);
     }
   };

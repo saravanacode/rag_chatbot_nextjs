@@ -11,13 +11,27 @@ import time
 
 # AI Assistant imports
 try:
+    print("🔄 Importing sentence-transformers...")
     from sentence_transformers import SentenceTransformer
+    print("✅ sentence-transformers imported")
+    
+    print("🔄 Importing pinecone...")
     from pinecone import Pinecone, ServerlessSpec
+    print("✅ pinecone imported")
+    
+    print("🔄 Importing google-generativeai...")
     import google.generativeai as genai
+    print("✅ google-generativeai imported")
+    
+    print("🔄 Importing firecrawl...")
     from firecrawl import AsyncFirecrawlApp, ScrapeOptions
+    print("✅ firecrawl imported")
+    
     AI_IMPORTS_AVAILABLE = True
+    print("🎉 All AI imports successful!")
 except ImportError as e:
-    print(f"⚠️ AI imports not available: {e}")
+    print(f"❌ AI import failed: {e}")
+    print(f"❌ Failed module: {e.name if hasattr(e, 'name') else 'unknown'}")
     AI_IMPORTS_AVAILABLE = False
 
 # Load environment variables
@@ -376,6 +390,20 @@ def health_check():
         "ai_components_loaded": ai_components["loaded"]
     })
 
+@app.route('/api/demo-status', methods=['GET'])
+def get_demo_status():
+    """Get demo mode loading status"""
+    return jsonify({
+        "success": True,
+        "data": {
+            "ai_components_loaded": ai_components["loaded"],
+            "model_loaded": bool(ai_components.get("model")),
+            "pinecone_connected": bool(ai_components.get("index")),
+            "gemini_ready": bool(ai_components.get("gemini_model")),
+            "demo_mode": stored_data.get('demo_mode', False)
+        }
+    })
+
 @app.route('/api/demo-mode', methods=['POST'])
 def start_demo_mode():
     """Start demo mode - load AI components and set demo flag"""
@@ -392,27 +420,49 @@ def start_demo_mode():
                 "error": "Gemini and Pinecone API keys required for demo mode"
             }), 400
         
-        # Load AI components
-        components = load_ai_components()
-        
-        # Set demo mode
-        stored_data['demo_mode'] = True
-        stored_data['api_keys'] = {
-            'pinecone': PINECONE_API_KEY,
-            'gemini': GEMINI_API_KEY
-        }
-        
-        return jsonify({
-            "success": True,
-            "message": "Demo mode started successfully! AI assistant is ready to answer questions.",
-            "data": {
-                "model_loaded": bool(components["model"]),
-                "pinecone_connected": bool(components["index"]),
-                "gemini_ready": bool(components["gemini_model"]),
-                "index_name": INDEX_NAME,
-                "model_name": MODEL_NAME
+        # Start loading in background if not already loaded
+        if not ai_components["loaded"]:
+            def load_components():
+                try:
+                    load_ai_components()
+                    stored_data['demo_mode'] = True
+                    stored_data['api_keys'] = {
+                        'pinecone': PINECONE_API_KEY,
+                        'gemini': GEMINI_API_KEY
+                    }
+                    print("🎉 Demo mode fully loaded!")
+                except Exception as e:
+                    print(f"❌ Background loading failed: {e}")
+            
+            import threading
+            thread = threading.Thread(target=load_components)
+            thread.daemon = True
+            thread.start()
+            
+            return jsonify({
+                "success": True,
+                "message": "Demo mode initialization started. Loading AI components...",
+                "loading": True
+            })
+        else:
+            # Already loaded
+            stored_data['demo_mode'] = True
+            stored_data['api_keys'] = {
+                'pinecone': PINECONE_API_KEY,
+                'gemini': GEMINI_API_KEY
             }
-        })
+            return jsonify({
+                "success": True,
+                "message": "Demo mode started successfully! AI assistant is ready.",
+                "loading": False,
+                "data": {
+                    "model_loaded": bool(ai_components["model"]),
+                    "pinecone_connected": bool(ai_components["index"]),
+                    "gemini_ready": bool(ai_components["gemini_model"]),
+                    "index_name": INDEX_NAME,
+                    "model_name": MODEL_NAME
+                }
+            })
         
     except Exception as e:
         print(f"❌ Error starting demo mode: {str(e)}")
