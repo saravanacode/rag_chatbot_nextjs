@@ -22,6 +22,23 @@ This project is an AI-powered chatbot with Retrieval-Augmented Generation (RAG) 
 - AI-powered chat with vector search
 - Handles web crawling and embeddings
 
+
+## 🔧 API Endpoints
+
+The Flask backend provides these endpoints:
+
+- `GET /health` - Health check and system status
+- `GET /` - Root endpoint with API overview
+- `POST /api/demo-mode` - Start demo mode with pre-loaded content
+- `GET /api/demo-status` - Check demo mode loading status
+- `POST /api/store-config` - Store API keys and URLs for custom crawling
+- `POST /api/crawl-and-vectorize` - Crawl stored URLs and create vector embeddings
+- `GET /api/vectorization-status` - Get real-time crawling/vectorization progress
+- `POST /api/chat` - Chat with AI using vector search or general conversation
+- `GET /api/status` - Get current backend status and configuration
+- `GET /api/debug-status` - Detailed debug information
+
+
 ## 🚀 Deployment Information
 
 ### Backend Deployment (Coolify + Docker)
