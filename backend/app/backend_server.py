@@ -24,7 +24,25 @@ except ImportError as e:
 dotenv.load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app, origins=[
+    "https://rag-chatbot-nextjs-1.onrender.com",
+    "https://rag-chatbot-nextjs.onrender.com", 
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://167.86.83.164:5000",
+    "https://167.86.83.164:5000"
+], supports_credentials=True, allow_headers=["Content-Type", "Authorization"])
+
+@app.after_request
+def after_request(response):
+    """Add security headers"""
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    # Allow mixed content for development
+    response.headers.add('Content-Security-Policy', "upgrade-insecure-requests")
+    return response
 
 # Configuration from environment variables
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
