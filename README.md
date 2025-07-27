@@ -1,70 +1,129 @@
-# Chatbot with Backend Integration
+# AI-Powered RAG Chatbot with Vector Search
 
-This project integrates a Next.js chatbot frontend with a Flask backend server that handles API keys, URL crawling, and AI chat functionality.
+This project is an AI-powered chatbot with Retrieval-Augmented Generation (RAG) capabilities, featuring a Next.js frontend and Flask backend with vector search functionality.
 
-## 🚀 Quick Start
+## 🚀 Live Demo
 
-### 1. Backend Setup (Flask Server on localhost:5000)
+- **Frontend**: Deployed on Render - [https://rag-chatbot-nextjs-1.onrender.com/](frontend)
+- **Backend**: Self-hosted with Coolify on custom domain - [https://api.pmshaver.pro](backend)
 
-The backend server handles:
-- API key management (PinecodeDB, OpenAI, Firecrawl)
-- URL crawling using Firecrawl API
-- AI chat responses using OpenAI API
-- Environment variable loading
+*Note: Frontend may take 30-60 seconds to load initially due to Render's free tier cold starts.*
 
-#### Option A: Automatic Setup
-```bash
-cd app
-python start_backend.py
+## 🏗️ Architecture
+
+**Frontend (Next.js)**
+- Deployed on Render (Free tier - Static deployment)
+- TypeScript + Tailwind CSS + Radix UI
+- Handles user interface and API communication
+
+**Backend (Flask + AI)**
+- Self-hosted using Coolify with Docker
+- Custom domain deployment
+- AI-powered chat with vector search
+- Handles web crawling and embeddings
+
+## 🚀 Deployment Information
+
+### Backend Deployment (Coolify + Docker)
+
+The backend is deployed using **Coolify** on a self-hosted server with Docker:
+
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+EXPOSE 5000
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app.backend_server:app"]
 ```
 
-#### Option B: Manual Setup
+**Deployment Features:**
+- Custom domain with SSL certificate
+- Docker containerization
+- Auto-deployment from Git
+- Environment variable management
+- Health checks and monitoring
+
+### Frontend Deployment (Render Static)
+
+The frontend is deployed on **Render's free tier** as a static Next.js application:
+
+**Build Settings:**
+- Build Command: `npm install && npm run build`
+- Start Command: `npm start`
+- Node Version: 18.x
+- Auto-deploy from GitHub
+
+**Performance Notes:**
+- ⚠️ **Initial Load Time**: Frontend may take 30-60 seconds to load due to Render's free tier cold start
+- Subsequent requests are faster once the service is warm
+- Consider upgrading to paid tier for instant loading
+
+## 🔧 Local Development
+
+### 1. Backend Setup (Flask Server)
+
 ```bash
-cd app
+cd backend
 pip install -r requirements.txt
-python backend_server.py
+python app/backend_server.py
 ```
 
-### 2. Frontend Setup (Next.js on localhost:3000)
+The backend runs on `localhost:5000` and handles:
+- API key management (Pinecone, Gemini AI, Firecrawl)
+- URL crawling and content extraction
+- Vector embeddings with sentence-transformers
+- AI chat responses using Google Gemini
+
+### 2. Frontend Setup (Next.js)
 
 ```bash
-cd project
+cd frontend/project
 npm install
 npm run dev
 ```
 
+Frontend runs on `localhost:3000` with features:
+- Modern chat interface
+- Real-time status updates
+- API key management
+- URL configuration
+
 ## 📋 Environment Variables
 
-Create `app/.env` file with your API keys:
-
+### Backend (.env)
 ```env
-OPENAI_API_KEY=sk-proj-your-openai-key-here
-PINECONE_API_KEY=pcsk_your-pinecone-key-here
-FIRECRAWL_API_KEY=fc-your-firecrawl-key-here
+GEMINI_API_KEY=your-gemini-api-key-here
+PINECONE_API_KEY=your-pinecone-api-key-here
+FIRECRAWL_API_KEY=your-firecrawl-api-key-here
+PINECONE_INDEX_NAME=airport-index
 ```
 
-**Note**: The app will work without environment variables - you can enter API keys manually in the frontend.
+### Frontend (.env)
+```env
+NEXT_PUBLIC_BACKEND_URL=https://api.yourdomain.com
+```
 
-## 🔧 API Endpoints
+## 🤖 AI Implementation
 
-The Flask backend provides these endpoints:
+**Google Gemini Integration** (Changed from OpenAI for cost optimization)
 
-- `GET /health` - Health check
-- `POST /api/store-config` - Store API keys and URLs
-- `POST /api/crawl-urls` - Crawl stored URLs using Firecrawl
-- `POST /api/chat` - Chat with AI using crawled content
-- `GET /api/status` - Get current backend status
+- **Model**: Gemini 1.5 Flash
+- **Reason for Switch**: Cost-effective alternative to OpenAI GPT-4
+- **Features**: 
+  - Retrieval-Augmented Generation (RAG)
+  - Vector similarity search
+  - Context-aware responses
+  - Semantic search capabilities
 
-## 🎯 How It Works
+**Vector Search Stack:**
+- **Embeddings**: BAAI/bge-small-en-v1.5 (384 dimensions)
+- **Vector DB**: Pinecone (serverless)
+- **Search**: Semantic similarity with cosine distance
+- **Content Processing**: Firecrawl for web scraping
 
-1. **Start Backend**: Run the Flask server on localhost:5000
-2. **Start Frontend**: Run the Next.js app on localhost:3000
-3. **Configure APIs**: Enter API keys (or use environment variables)
-4. **Add URLs**: Add websites to crawl for content
-5. **Crawl Content**: Backend uses Firecrawl API to extract content
-6. **Chat**: Ask questions and get AI responses based on crawled content
-
-## 🔄 Data Flow
+## 🔄 Application Flow
 
 ```
 Frontend (Next.js) → Backend (Flask) → External APIs
